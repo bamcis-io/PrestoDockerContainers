@@ -1,0 +1,9 @@
+connector.name=hive-hadoop2
+hive.metastore.uri={{HIVE_DATA}}
+hive.s3.aws-access-key={{AWS_ACCESS_KEY}}
+hive.s3.aws-secret-key={{AWS_SECRET_KEY}}
+hive.s3.endpoint={{AWS_S3_ENDPOINT}}
+hive.storage-format=AVRO
+hive.metastore.username={{HIVE_USER}}
+hive.metastore.authentication.type=NONE
+hive.config.resources={{PRESTO_HOME}}/etc/core-site.xml

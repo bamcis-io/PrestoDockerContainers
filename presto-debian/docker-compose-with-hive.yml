@@ -1,0 +1,59 @@
+version: '3'
+
+services:
+  hive_metastore_service:
+    image: bamcis/hive-debian-metastore:2.3.2
+    container_name: hive_metastore_service
+    ports:
+     - 9083:9083
+    env_file:
+    - hive_metastore.env
+    networks:
+    - presto
+  coordinator:
+    image: bamcis/presto-debian:0.198
+    container_name: presto_coordinator
+    depends_on:
+    - hive_metastore_service
+    ports:
+    - 8080:8080
+    env_file:
+    - ./presto.env
+    networks:
+    - presto
+    environment:
+      ROLE: coordinator
+      HIVE_METASTORE_URI: thrift://hive_metastore_service:9083
+      METASTORE_LOCATION: remote
+  worker0:
+    image: bamcis/presto-debian:0.198
+    container_name: presto_worker_0
+    depends_on:
+    - coordinator
+    env_file:
+    - ./presto.env
+    environment:
+      ROLE: worker
+      PRESTO_DISCOVERY_SERVER: http://coordinator:8080
+      HIVE_METASTORE_URI: thrift://hive_metastore_service:9083
+      METASTORE_LOCATION: remote
+    networks:
+    - presto
+  worker1:
+    image: bamcis/presto-debian:0.198
+    container_name: presto_worker_1
+    depends_on:
+    - coordinator
+    env_file:
+    - ./presto.env
+    environment:
+      ROLE: worker
+      PRESTO_DISCOVERY_SERVER: http://coordinator:8080
+      HIVE_METASTORE_URI: thrift://hive_metastore_service:9083
+      METASTORE_LOCATION: remote
+    networks:
+    - presto
+
+networks:
+  presto:
+    external: true

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+  <property>
+    <name>fs.s3a.awsAccessKeyId</name>
+    <value>{{AWS_ACCESS_KEY}}</value>
+  </property>
+  <property>
+    <name>fs.s3a.awsSecretAccessKey</name>
+    <value>{{AWS_SECRET_KEY}}</value>
+  </property>
+</configuration>

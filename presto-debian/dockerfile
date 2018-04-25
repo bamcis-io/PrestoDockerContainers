@@ -1,0 +1,109 @@
+ARG JAVA_VERSION=8
+
+FROM openjdk:${JAVA_VERSION}-slim
+
+MAINTAINER Michael Haken michael.haken@outlook.com
+
+ARG PRESTO_BASE_PATH="/opt/presto"
+ARG PRESTO_VERSION="0.198"
+ARG PRESTO_DATA_PATH="/var/presto/data"
+ARG PRESTO_USER="presto"
+ARG PRESTO_HIVE_CATALOG="/var/presto/hive_catalog"
+ARG PRESTO_PORT="8080"
+ARG PRESTO_ENVIRONMENT="production"
+ARG MAX_MEMORY="50GB"
+ARG MAX_MEMORY_PER_NODE="1GB"
+ARG ENTRY_POINT_FILE="entrypoint.sh"
+
+ENV PATH="${PRESTO_BASE_PATH}/bin:${PATH}" \
+	PRESTO_HOME="${PRESTO_BASE_PATH}" \
+	PRESTO_DATA="${PRESTO_DATA_PATH}" \
+	PRESTO_LOGS="/var/log/presto" \
+	PRESTO_HIVE_CATALOG="${PRESTO_HIVE_CATALOG}" \
+	PRESTO_USER="${PRESTO_USER}" \
+	PRESTO_ENVIRONMENT="${PRESTO_ENVIRONMENT}" \
+	PRESTO_MAX_MEMORY="${MAX_MEMORY}" \
+	PRESTO_MAX_MEMORY_PER_NODE="${MAX_MEMORY_PER_NODE}" \
+	PRESTO_PORT="${PRESTO_PORT}" \
+	ROLE=""
+	METASTORE_LOCATION="local"
+
+RUN DEBIAN_FRONTEND="noninteractive" \
+	&& apt-get update \
+	&& apt-get -y upgrade \
+	&& apt-get --assume-yes install wget bash python2.7 python-pip \
+	#
+	# Hadoop native dependency libs for Hive connector
+	#
+	bzip2 fts fuse libssl-dev libsnappy-dev zlib1g-dev \
+	&& pip install --upgrade pip \
+	#
+	# Create all of the directories we need
+	#
+	&& mkdir -p "${PRESTO_HOME}" \
+	&& mkdir -p "${PRESTO_HOME}/etc" \
+	&& mkdir -p "${PRESTO_DATA}" \
+	&& mkdir -p "${PRESTO_LOGS}" \
+	&& mkdir -p "${PRESTO_HIVE_CATALOG}" \
+	#
+	# -O- output payload to stdout, and use -q to supress all wget
+	# output, so only tar file is sent down the pipeline
+	#
+	&& wget -qO- "https://repo1.maven.org/maven2/com/facebook/presto/presto-server/${PRESTO_VERSION}/presto-server-${PRESTO_VERSION}.tar.gz" \
+	#
+	# Use --strip 1 to remove the first folder from the file names
+	# which is presto-server-"${PRESTO_VERSION}" so that we properly create the
+	# folder structure in /opt/presto
+	# -f - specifies that the archive location is from the pipeline
+	#
+	| tar -zxv -f - --directory "${PRESTO_HOME}" --strip 1 \
+	# Download presto client
+	&& wget -q -O "${PRESTO_HOME}/bin/presto" "https://repo1.maven.org/maven2/com/facebook/presto/presto-cli/${PRESTO_VERSION}/presto-cli-${PRESTO_VERSION}-executable.jar" \
+	&& chmod +x "${PRESTO_HOME}/bin/presto" \
+	#
+	# Add the group and user for running the hadoop services
+	# Use -gecos "" to bypass prompts
+	#
+	&& addgroup --system presto \
+	#
+	# Need to use /bin/bash instead of /bin/nologin so we can
+	# use 'su' to run the presto services
+	#
+	&& adduser --system --ingroup presto --home /home/"${PRESTO_USER}" --shell /bin/bash --disabled-password -gecos "" "${PRESTO_USER}" \
+	# Required to prevent the sshd[29]: User hdadmin not allowed because account is locked error
+	# Setting the password to '*' makes the user unable to login using a unix based password
+	&& usermod -p '*' "${PRESTO_USER}" \
+	#
+	# Make sure the presto user owns all of the necessary directories
+    #
+	&& chown -R "${PRESTO_USER}":"${PRESTO_USER}" "${PRESTO_HOME}" "${PRESTO_LOGS}" "${PRESTO_DATA}" "${PRESTO_HIVE_CATALOG}" \
+	#
+	# Add these environment variables for presto to use from bash
+	#
+	&& echo "export PRESTO_HOME=${PRESTO_HOME}" >> /home/"${PRESTO_USER}"/.bashrc \
+	&& echo "export PATH=${PATH}" >> /home/"${PRESTO_USER}"/.bashrc \
+	&& echo "export JAVA_HOME=${JAVA_HOME}" >> /home/"${PRESTO_USER}"/.bashrc \
+	#
+	# Add these environment variables for hive to use from sh
+	#
+	&& echo "export PRESTO_HOME=${PRESTO_HOME}" >> /home/"${PRESTO_USER}"/.profile \
+	&& echo "export PATH=${PATH}" >> /home/"${PRESTO_USER}"/.profile \
+	&& echo "export JAVA_HOME=${JAVA_HOME}" >> /home/"${PRESTO_USER}"/.profile \
+	#
+	# Remove unneeded apt packages
+	#
+	&& apt-get remove --purge -y wget \
+	&& apt-get autoclean -y \
+	&& apt-get autoremove -y \
+	&& apt-get clean -y \
+	&& rm -rf /var/lib/apt/lists/*
+
+
+COPY etc "${PRESTO_HOME}/etc"
+COPY "${ENTRY_POINT_FILE}" "/var/presto/entrypoint.sh"
+
+EXPOSE "${PRESTO_PORT}"
+
+WORKDIR "${PRESTO_BASE_PATH}"
+
+ENTRYPOINT ["/var/presto/entrypoint.sh"]

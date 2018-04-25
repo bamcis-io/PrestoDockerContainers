@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  coordinator:
+    image: bamcis/presto-alpine:0.198
+    container_name: presto_coordinator
+    ports:
+    - 8080:8080
+    env_file:
+    - ./presto.env
+    networks:
+    - presto
+    environment:
+      ROLE: coordinator
+      METASTORE_LOCATION: local
+  worker0:
+    image: bamcis/presto-alpine:0.198
+    container_name: presto_worker_0
+    depends_on:
+    - coordinator
+    env_file:
+    - ./presto.env
+    environment:
+      ROLE: worker
+      PRESTO_DISCOVERY_SERVER: http://coordinator:8080
+      METASTORE_LOCATION: local
+    networks:
+    - presto
+  worker1:
+    image: bamcis/presto-alpine:0.198
+    container_name: presto_worker_1
+    depends_on:
+    - coordinator
+    env_file:
+    - ./presto.env
+    environment:
+      ROLE: worker
+      PRESTO_DISCOVERY_SERVER: http://coordinator:8080
+      METASTORE_LOCATION: local
+    networks:
+    - presto
+
+networks:
+  presto:
+    external: true

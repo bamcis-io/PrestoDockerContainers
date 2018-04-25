@@ -1,0 +1,5 @@
+coordinator=false
+http-server.http.port={{PRESTO_PORT}}
+query.max-memory={{MAX_MEMORY}}
+query.max-memory-per-node={{MAX_MEMORY_PER_NODE}}
+discovery.uri={{DISCOVERY_URI}}
